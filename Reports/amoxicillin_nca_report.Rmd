@@ -1,0 +1,150 @@
+---
+title: "Amoxicillin Non-Compartmental PK Analysis"
+author: "Ketsia Efoloko"
+date: "2025-12-20"
+output:
+  html_document:
+   toc: true
+   toc_depth: 2
+   theme: flatly
+---
+knitr::opts_chunk$set(
+echo = TRUE,
+message = FALSE,
+warning = FALSE)
+
+1. Introduction
+
+Amoxicillin is a widely used β-lactam antibiotic.
+This report presents a non-compartmental pharmacokinetic (NCA) analysis
+of concentration–time data following a single oral dose.
+
+The objective was to estimate key PK parameters including Cmax, Tmax,
+Cmin, and AUC (0–8 h) using reproducible R workflows.
+
+2. Methods
+
+2.1. Software
+
+library(tidyverse)
+library(DescTools)
+library(PKNCA)
+library(kableExtra)
+
+2.2. Data Import
+
+amoxicillin <- read.csv("amoxicillin.csv")
+
+2.3. Individual PK Summary
+
+pk_individual <- amoxicillin %>%
+ group_by(ID) %>%
+ summarise(
+ cmin     = min(conc),
+ cmax     = max(conc),
+ tmin     = time[which.min(conc)],
+ tmax     = time[which.max(conc)],
+ median_conc = median(conc),
+ iqr_conc    = IQR(conc),
+ sd_conc     = sd(conc),
+ .groups  = "drop"
+ )
+
+pk_individual %>%
+kbl(caption = "Individual PK Summary") %>%
+ kable_styling(full_width = FALSE)
+
+2.4. Population Summary
+
+pk_population <- pk_individual %>%
+ summarise(
+ mean_cmin = mean(cmin),
+ mean_cmax = mean(cmax),
+ mean_sd   = mean(sd_conc)
+ )
+
+2.5. Concentration–Time Profiles
+
+ggplot(amoxicillin, aes(time,conc, group=ID))+
+  geom_point()+
+  labs(
+    title = "Amoxicillin Concentration-Time Profiles", 
+    x= "Time (hours)", 
+    y= "Concentration (mg/L)")+
+  geom_line(alpha=0.7)+
+  theme_bw()+
+  facet_wrap(~ID)
+
+ggplot(amoxicillin, aes(x=time, y=conc, group=ID))+
+  geom_point(aes(colour=ID))+
+  labs(title = "Concentration vs Time graph", x= "Time(hrs)", y= "concentration(mg)")+
+  geom_line(aes(colour=ID))+
+  theme_bw()
+
+ggplot(amoxicillin, aes(time, conc, group=ID, colour = ID))+
+  geom_point()+
+  scale_y_log10()+
+  labs(
+    title = "Log-Scale Concentration-Time Profiles", 
+    x= "Time (hours)", 
+    y= "Log Concentration (mg/L)")+
+  geom_line()+
+  theme_bw()
+  
+
+2.6. AUC (0–8 h)
+
+AUC_by_ID <- amoxicillin %>%
+  group_by(ID) %>%
+  summarise(
+    AUC0_8=AUC(time,conc,method="trapezoid"),
+    .groups = 'drop')
+    
+AUC_summary <- AUC_by_ID %>%
+  summarise(
+    Mean_AUC=mean(AUC0_8), 
+    SD_AUC=SD(AUC0_8))
+
+AUC_by_ID %>%
+  kbl(booktabs=TRUE,caption="AUC (0-8h) by Individual") %>%
+  kable_styling(bootstrap_options = "striped")
+
+
+2.7. Non-Compartmental Analysis (PKNCA)
+
+DoseAmox <- amoxicillin %>%
+  subset(time==0) %>%
+  mutate(dose=1000)
+
+amox_conc <- PKNCAconc(amoxicillin, conc~time|ID)
+amox_dose <- PKNCAdose(DoseAmox, dose~time|ID)
+
+amox_pkdata <- PKNCAdata(
+  amox_conc,
+  amox_dose,
+  options = list(auc.method = "linear")
+)
+
+amox_nca <- pk.nca(amox_pkdata)
+summary(amox_nca)
+
+
+3. Results
+
+The mean Cmax and AUC values were consistent across individuals,
+with concentration–time profiles showing rapid absorption followed by
+elimination. Log-scale plots indicated approximately linear terminal
+elimination phases.
+
+4. Discussion
+
+This analysis demonstrates the application of non-compartmental methods
+to clinical-style PK data using reproducible R workflows. The use of
+PKNCA enables transparent estimation of exposure metrics commonly used
+in clinical pharmacology and drug development.
+
+5. Conclusion
+
+This report illustrates a complete, reproducible PK analysis suitable
+for entry-level roles in clinical pharmacology, data analysis, and
+pharmaceutical research environments.
