@@ -25,6 +25,14 @@ pk_individual <- amoxicillin %>%
     .groups = 'drop'
     )
 
+pk_table <- pk_individual %>% 
+  kbl(booktabs=TRUE,caption = "Individual PK Summary") %>%
+  kable_styling(bootstrap_options = 'striped')
+
+save_kable(
+  pk_table,
+  file = "Individual_PK_Summary.html")
+
 pk_population <- pk_individual %>%
   summarise(
     mean_cmin = mean(cmin),
